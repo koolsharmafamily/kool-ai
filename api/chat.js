@@ -168,13 +168,29 @@ async function streamGoogle({ messages, model, send }) {
     throw new Error(`Google API error ${res.status}: ${text.slice(0, 300)}`)
   }
 
+  let sawDelta = false
+  let finishReason = null
+
   await forwardSSE(res.body, (evt) => {
     if (evt.promptFeedback?.blockReason) {
       throw new Error(`Gemini blocked the prompt: ${evt.promptFeedback.blockReason}`)
     }
-    const delta = evt.candidates?.[0]?.content?.parts?.[0]?.text
-    if (delta) send({ delta })
+    const candidate = evt.candidates?.[0]
+    if (candidate?.finishReason) finishReason = candidate.finishReason
+    const delta = candidate?.content?.parts?.[0]?.text
+    if (delta) {
+      sawDelta = true
+      send({ delta })
+    }
   })
+
+  if (!sawDelta) {
+    throw new Error(
+      finishReason
+        ? `Gemini returned no text (finishReason: ${finishReason})`
+        : 'Gemini returned an empty response stream'
+    )
+  }
 }
 
 async function forwardSSE(body, onEvent) {
@@ -191,9 +207,16 @@ async function forwardSSE(body, onEvent) {
     buffer = chunks.pop()
 
     for (const chunk of chunks) {
-      const line = chunk.split('\n').find((l) => l.startsWith('data:'))
-      if (!line) continue
-      const data = line.slice(5).trim()
+      // Per the SSE spec a single event's data can span multiple physical
+      // lines, each prefixed with "data:" — join them all before parsing.
+      // (Gemini's JSON payloads can be large enough to get wrapped this way;
+      // Anthropic/OpenAI always send one line, so this is a no-op for them.)
+      const dataLines = chunk.split('\n').filter((l) => l.startsWith('data:'))
+      if (dataLines.length === 0) continue
+      const data = dataLines
+        .map((l) => l.slice(5).trimStart())
+        .join('\n')
+        .trim()
       if (!data || data === '[DONE]') continue
       let evt
       try {
