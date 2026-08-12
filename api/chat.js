@@ -172,33 +172,38 @@ async function streamGoogle({ messages, model, send }) {
   let finishReason = null
   let eventCount = 0
   let lastRawEvent = null
+  const rawCapture = { text: '' }
 
-  await forwardSSE(res.body, (evt) => {
-    eventCount += 1
-    lastRawEvent = evt
-    if (evt.promptFeedback?.blockReason) {
-      throw new Error(`Gemini blocked the prompt: ${evt.promptFeedback.blockReason}`)
-    }
-    const candidate = evt.candidates?.[0]
-    if (candidate?.finishReason) finishReason = candidate.finishReason
-    const delta = candidate?.content?.parts?.[0]?.text
-    if (delta) {
-      sawDelta = true
-      send({ delta })
-    }
-  })
+  await forwardSSE(
+    res.body,
+    (evt) => {
+      eventCount += 1
+      lastRawEvent = evt
+      if (evt.promptFeedback?.blockReason) {
+        throw new Error(`Gemini blocked the prompt: ${evt.promptFeedback.blockReason}`)
+      }
+      const candidate = evt.candidates?.[0]
+      if (candidate?.finishReason) finishReason = candidate.finishReason
+      const delta = candidate?.content?.parts?.[0]?.text
+      if (delta) {
+        sawDelta = true
+        send({ delta })
+      }
+    },
+    rawCapture
+  )
 
   if (!sawDelta) {
-    const debugInfo = lastRawEvent ? JSON.stringify(lastRawEvent).slice(0, 500) : 'no events parsed at all'
+    const debugInfo = lastRawEvent ? JSON.stringify(lastRawEvent).slice(0, 500) : rawCapture.text.slice(0, 500)
     throw new Error(
       `Gemini returned no text after ${eventCount} event(s)` +
         (finishReason ? ` (finishReason: ${finishReason})` : '') +
-        ` — last raw event: ${debugInfo}`
+        ` — raw: ${JSON.stringify(debugInfo)}`
     )
   }
 }
 
-async function forwardSSE(body, onEvent) {
+async function forwardSSE(body, onEvent, rawCapture) {
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
@@ -206,7 +211,9 @@ async function forwardSSE(body, onEvent) {
   while (true) {
     const { value, done } = await reader.read()
     if (done) break
-    buffer += decoder.decode(value, { stream: true })
+    const decoded = decoder.decode(value, { stream: true })
+    if (rawCapture && rawCapture.text.length < 500) rawCapture.text += decoded
+    buffer += decoded
 
     const chunks = buffer.split('\n\n')
     buffer = chunks.pop()
