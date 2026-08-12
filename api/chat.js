@@ -170,40 +170,30 @@ async function streamGoogle({ messages, model, send }) {
 
   let sawDelta = false
   let finishReason = null
-  let eventCount = 0
-  let lastRawEvent = null
-  const rawCapture = { text: '' }
 
-  await forwardSSE(
-    res.body,
-    (evt) => {
-      eventCount += 1
-      lastRawEvent = evt
-      if (evt.promptFeedback?.blockReason) {
-        throw new Error(`Gemini blocked the prompt: ${evt.promptFeedback.blockReason}`)
-      }
-      const candidate = evt.candidates?.[0]
-      if (candidate?.finishReason) finishReason = candidate.finishReason
-      const delta = candidate?.content?.parts?.[0]?.text
-      if (delta) {
-        sawDelta = true
-        send({ delta })
-      }
-    },
-    rawCapture
-  )
+  await forwardSSE(res.body, (evt) => {
+    if (evt.promptFeedback?.blockReason) {
+      throw new Error(`Gemini blocked the prompt: ${evt.promptFeedback.blockReason}`)
+    }
+    const candidate = evt.candidates?.[0]
+    if (candidate?.finishReason) finishReason = candidate.finishReason
+    const delta = candidate?.content?.parts?.[0]?.text
+    if (delta) {
+      sawDelta = true
+      send({ delta })
+    }
+  })
 
   if (!sawDelta) {
-    const debugInfo = lastRawEvent ? JSON.stringify(lastRawEvent).slice(0, 500) : rawCapture.text.slice(0, 500)
     throw new Error(
-      `Gemini returned no text after ${eventCount} event(s)` +
-        (finishReason ? ` (finishReason: ${finishReason})` : '') +
-        ` — raw: ${JSON.stringify(debugInfo)}`
+      finishReason
+        ? `Gemini returned no text (finishReason: ${finishReason})`
+        : 'Gemini returned an empty response stream'
     )
   }
 }
 
-async function forwardSSE(body, onEvent, rawCapture) {
+async function forwardSSE(body, onEvent) {
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
@@ -212,8 +202,11 @@ async function forwardSSE(body, onEvent, rawCapture) {
     const { value, done } = await reader.read()
     if (done) break
     const decoded = decoder.decode(value, { stream: true })
-    if (rawCapture && rawCapture.text.length < 500) rawCapture.text += decoded
-    buffer += decoded
+    // Normalize CRLF to LF — Gemini's SSE stream separates events with
+    // "\r\n\r\n", which a plain "\n\n" split never matches, silently
+    // dropping every event. Anthropic/OpenAI already use bare "\n", so
+    // this is a no-op for them.
+    buffer += decoded.replace(/\r\n/g, '\n')
 
     const chunks = buffer.split('\n\n')
     buffer = chunks.pop()
