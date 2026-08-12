@@ -36,16 +36,16 @@ export const MODELS = [
     description: 'Fast and inexpensive',
   },
   {
-    id: 'gemini-2.5-flash',
-    label: 'Gemini 2.5 Flash',
+    id: 'gemini-flash-latest',
+    label: 'Gemini Flash (latest)',
     provider: 'google',
-    description: 'Free tier available — fast and capable',
+    description: 'Free tier available — auto-updates to the current Flash model',
   },
   {
-    id: 'gemini-2.0-flash',
-    label: 'Gemini 2.0 Flash',
+    id: 'gemini-flash-lite-latest',
+    label: 'Gemini Flash-Lite (latest)',
     provider: 'google',
-    description: 'Free tier available — lightweight',
+    description: 'Free tier available — auto-updates to the current Flash-Lite model',
   },
 ]
 

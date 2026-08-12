@@ -39,7 +39,11 @@ src/
 |---|---|---|---|
 | `ANTHROPIC_API_KEY` | Claude Sonnet 5 / Opus 5 / Haiku 4.5 | https://console.anthropic.com/ | Pay-as-you-go |
 | `OPENAI_API_KEY` | GPT-4o / GPT-4 Turbo / GPT-3.5 Turbo | https://platform.openai.com/api-keys | Pay-as-you-go |
-| `GOOGLE_API_KEY` | Gemini 2.5 Flash / Gemini 2.0 Flash | https://aistudio.google.com/apikey | Free tier (rate-limited) |
+| `GOOGLE_API_KEY` | Gemini Flash / Flash-Lite (latest) | https://aistudio.google.com/apikey | Free tier (rate-limited) |
+
+The Gemini models use Google's rolling `-latest` aliases
+(`gemini-flash-latest`, `gemini-flash-lite-latest`) rather than dated model
+IDs, so they keep working automatically as Google retires older versions.
 
 You only need the key(s) for the provider(s) you actually want to use — the
 app works in demo mode with none set. If you want real responses at zero
