@@ -170,8 +170,12 @@ async function streamGoogle({ messages, model, send }) {
 
   let sawDelta = false
   let finishReason = null
+  let eventCount = 0
+  let lastRawEvent = null
 
   await forwardSSE(res.body, (evt) => {
+    eventCount += 1
+    lastRawEvent = evt
     if (evt.promptFeedback?.blockReason) {
       throw new Error(`Gemini blocked the prompt: ${evt.promptFeedback.blockReason}`)
     }
@@ -185,10 +189,11 @@ async function streamGoogle({ messages, model, send }) {
   })
 
   if (!sawDelta) {
+    const debugInfo = lastRawEvent ? JSON.stringify(lastRawEvent).slice(0, 500) : 'no events parsed at all'
     throw new Error(
-      finishReason
-        ? `Gemini returned no text (finishReason: ${finishReason})`
-        : 'Gemini returned an empty response stream'
+      `Gemini returned no text after ${eventCount} event(s)` +
+        (finishReason ? ` (finishReason: ${finishReason})` : '') +
+        ` — last raw event: ${debugInfo}`
     )
   }
 }
