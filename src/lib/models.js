@@ -35,9 +35,27 @@ export const MODELS = [
     provider: 'openai',
     description: 'Fast and inexpensive',
   },
+  {
+    id: 'gemini-2.5-flash',
+    label: 'Gemini 2.5 Flash',
+    provider: 'google',
+    description: 'Free tier available — fast and capable',
+  },
+  {
+    id: 'gemini-2.0-flash',
+    label: 'Gemini 2.0 Flash',
+    provider: 'google',
+    description: 'Free tier available — lightweight',
+  },
 ]
 
 export const DEFAULT_MODEL_ID = MODELS[0].id
+
+const PROVIDER_COLORS = {
+  anthropic: 'bg-accent-500',
+  openai: 'bg-emerald-500',
+  google: 'bg-sky-500',
+}
 
 export function getModel(id) {
   return MODELS.find((m) => m.id === id) || MODELS[0]
@@ -45,4 +63,8 @@ export function getModel(id) {
 
 export function providerForModel(id) {
   return getModel(id).provider
+}
+
+export function providerColor(provider) {
+  return PROVIDER_COLORS[provider] || 'bg-slate-500'
 }

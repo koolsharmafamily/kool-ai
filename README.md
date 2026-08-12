@@ -1,13 +1,13 @@
 # Kool AI
 
 A functional AI chat interface — React + Vite + Tailwind on the frontend, a
-serverless proxy that streams from the Anthropic or OpenAI API.
+serverless proxy that streams from the Anthropic, OpenAI, or Google API.
 
 ## Features
 
 - Chat input + message list with auto-scroll
 - Message history persisted to `localStorage` (survives reloads)
-- Model selector: 3 Claude models, 3 GPT models
+- Model selector: 3 Claude models, 3 GPT models, 2 Gemini models (free tier)
 - Token-by-token streaming with a blinking cursor while generating
 - New conversation / clear chat
 - Copy message, delete message
@@ -18,7 +18,7 @@ serverless proxy that streams from the Anthropic or OpenAI API.
 ## Project structure
 
 ```
-api/chat.js            Vercel Edge Function — proxies to Anthropic/OpenAI, normalizes SSE
+api/chat.js            Vercel Edge Function — proxies to Anthropic/OpenAI/Google, normalizes SSE
 src/
   App.jsx              Layout: header, chat window, input
   hooks/useChat.js      Message state, localStorage persistence, streaming lifecycle
@@ -35,13 +35,16 @@ src/
 
 ## Required API keys
 
-| Key | Used for | Get it from |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | Claude Sonnet 5 / Opus 5 / Haiku 4.5 | https://console.anthropic.com/ |
-| `OPENAI_API_KEY` | GPT-4o / GPT-4 Turbo / GPT-3.5 Turbo | https://platform.openai.com/api-keys |
+| Key | Used for | Get it from | Cost |
+|---|---|---|---|
+| `ANTHROPIC_API_KEY` | Claude Sonnet 5 / Opus 5 / Haiku 4.5 | https://console.anthropic.com/ | Pay-as-you-go |
+| `OPENAI_API_KEY` | GPT-4o / GPT-4 Turbo / GPT-3.5 Turbo | https://platform.openai.com/api-keys | Pay-as-you-go |
+| `GOOGLE_API_KEY` | Gemini 2.5 Flash / Gemini 2.0 Flash | https://aistudio.google.com/apikey | Free tier (rate-limited) |
 
 You only need the key(s) for the provider(s) you actually want to use — the
-app works in demo mode with neither key set. Keys are read **server-side
+app works in demo mode with none set. If you want real responses at zero
+cost, Google AI Studio's free tier (`GOOGLE_API_KEY`) is the one to grab —
+no payment method required, just rate-limited. Keys are read **server-side
 only** inside `api/chat.js` and are never sent to the browser.
 
 ## Local development
@@ -64,7 +67,7 @@ static site and the serverless function together:
 
 ```bash
 npm install -g vercel
-cp .env.example .env.local   # fill in ANTHROPIC_API_KEY and/or OPENAI_API_KEY
+cp .env.example .env.local   # fill in ANTHROPIC_API_KEY, OPENAI_API_KEY, and/or GOOGLE_API_KEY
 vercel dev
 ```
 
@@ -77,6 +80,7 @@ vercel dev
 3. Under **Project Settings → Environment Variables**, add:
    - `ANTHROPIC_API_KEY` — your Anthropic key (skip if you won't use Claude models)
    - `OPENAI_API_KEY` — your OpenAI key (skip if you won't use GPT models)
+   - `GOOGLE_API_KEY` — your Google AI Studio key (skip if you won't use Gemini models; this is the free-tier option)
 4. Deploy. Vercel builds the Vite app to `dist/` and automatically deploys
    `api/chat.js` as an Edge Function at `/api/chat` — no extra config needed.
 5. Open the deployed URL, pick a model, and chat. If a key for the selected
@@ -92,12 +96,13 @@ vercel login
 vercel            # deploy a preview
 vercel env add ANTHROPIC_API_KEY
 vercel env add OPENAI_API_KEY
+vercel env add GOOGLE_API_KEY
 vercel --prod     # deploy to production
 ```
 
 ## Notes on the streaming protocol
 
-`api/chat.js` normalizes both providers into the same wire format so the
+`api/chat.js` normalizes all three providers into the same wire format so the
 frontend never needs to know which provider is behind a given model:
 
 ```
@@ -109,6 +114,8 @@ data: [DONE]
 
 ```
 
-Anthropic's `content_block_delta` text events and OpenAI's
-`choices[0].delta.content` chunks are both translated into `{"delta": "..."}`
-before being forwarded, so swapping models never changes frontend code.
+Anthropic's `content_block_delta` text events, OpenAI's
+`choices[0].delta.content` chunks, and Gemini's
+`candidates[0].content.parts[0].text` chunks are all translated into
+`{"delta": "..."}` before being forwarded, so swapping models never changes
+frontend code.

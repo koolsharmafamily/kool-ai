@@ -5,6 +5,7 @@
 // Required env vars (set in Vercel project settings, never in the client):
 //   ANTHROPIC_API_KEY - required to use any claude-* model
 //   OPENAI_API_KEY    - required to use any gpt-* model
+//   GOOGLE_API_KEY    - required to use any gemini-* model (free tier available)
 
 export const config = { runtime: 'edge' }
 
@@ -13,6 +14,7 @@ const SYSTEM_PROMPT = 'You are Kool AI, a helpful, concise assistant.'
 function providerForModel(model) {
   if (model.startsWith('claude')) return 'anthropic'
   if (model.startsWith('gpt')) return 'openai'
+  if (model.startsWith('gemini')) return 'google'
   return null
 }
 
@@ -46,8 +48,10 @@ export default async function handler(req) {
       try {
         if (provider === 'anthropic') {
           await streamAnthropic({ messages, model, send })
-        } else {
+        } else if (provider === 'openai') {
           await streamOpenAI({ messages, model, send })
+        } else {
+          await streamGoogle({ messages, model, send })
         }
       } catch (err) {
         send({ error: err.message || 'Upstream stream error' })
@@ -129,6 +133,46 @@ async function streamOpenAI({ messages, model, send }) {
 
   await forwardSSE(res.body, (evt) => {
     const delta = evt.choices?.[0]?.delta?.content
+    if (delta) send({ delta })
+  })
+}
+
+async function streamGoogle({ messages, model, send }) {
+  const apiKey = process.env.GOOGLE_API_KEY
+  if (!apiKey) throw new Error('GOOGLE_API_KEY is not configured on the server')
+
+  const contents = messages
+    .filter((m) => m.role === 'user' || m.role === 'assistant')
+    .map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }))
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
+      body: JSON.stringify({
+        contents,
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      }),
+    }
+  )
+
+  if (!res.ok || !res.body) {
+    const text = await safeText(res)
+    throw new Error(`Google API error ${res.status}: ${text.slice(0, 300)}`)
+  }
+
+  await forwardSSE(res.body, (evt) => {
+    if (evt.promptFeedback?.blockReason) {
+      throw new Error(`Gemini blocked the prompt: ${evt.promptFeedback.blockReason}`)
+    }
+    const delta = evt.candidates?.[0]?.content?.parts?.[0]?.text
     if (delta) send({ delta })
   })
 }

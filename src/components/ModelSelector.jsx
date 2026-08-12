@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MODELS, getModel } from '../lib/models'
+import { MODELS, getModel, providerColor } from '../lib/models'
 import { ChevronDownIcon, CheckIcon } from './icons'
 
 export default function ModelSelector({ value, onChange, disabled }) {
@@ -23,11 +23,7 @@ export default function ModelSelector({ value, onChange, disabled }) {
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-2 rounded-lg border border-surface-700 bg-surface-850 px-3 py-1.5 text-sm text-slate-200 hover:bg-surface-800 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <span
-          className={`h-1.5 w-1.5 rounded-full ${
-            current.provider === 'anthropic' ? 'bg-accent-500' : 'bg-emerald-500'
-          }`}
-        />
+        <span className={`h-1.5 w-1.5 rounded-full ${providerColor(current.provider)}`} />
         {current.label}
         <ChevronDownIcon className={`transition-transform ${open ? 'rotate-180' : ''}`} width={14} height={14} />
       </button>
@@ -43,11 +39,7 @@ export default function ModelSelector({ value, onChange, disabled }) {
               }}
               className="flex w-full items-start gap-2 px-3 py-2.5 text-left hover:bg-surface-800"
             >
-              <span
-                className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
-                  m.provider === 'anthropic' ? 'bg-accent-500' : 'bg-emerald-500'
-                }`}
-              />
+              <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${providerColor(m.provider)}`} />
               <span className="min-w-0 flex-1">
                 <span className="block text-sm text-slate-100">{m.label}</span>
                 <span className="block truncate text-xs text-slate-500">{m.description}</span>
